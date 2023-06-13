@@ -1,0 +1,1000 @@
+/* =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= CÓDIGO ESCRAVO 2 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+Estrutura CAN:
+  - 1º: Bit de Start(0 para mensagem enviada);
+  - 2º: Bits de ID ( 11 bits);
+  - 3º: Bit de Requisição de transmissão(1 bit - Bit 0 mestre envia e bit 1 recebe);
+  - 4º: Bits de controle (6 bits - definem tamanho de ID e data);
+  - 5º: Bits de informação (0-64 bits  mensagem);
+  - 6º: Bits de redundancia (16 bits) garante a integridade;
+  - 7º: Bits de confirmação (2 bits) garante que recebeu;
+  - 8º: Bits de fim(7 bit - serão 7 1 seguidos);
+
+
+Leitura: pino 13
+
+IP Mestre   : 1000000 (64 em decimal)
+IP Escravo 1: 1000001 (65 em decimal)
+IP Escravo 2: 1000010 (66 em decimal)
+
+1 - Dominante ( ambos em 1.67 V)
+0 - Recessivo ( 3.3 e 0 V)
+
+Sender_or_Receiver:
+  - pino 26: LOW
+  - pino 27: LOW
+  - pino 13: HIGH
+  - pino 14: HIGH
+
+
+*/
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define SCREEN_WIDTH 128  // OLED display largura, em pixels
+#define SCREEN_HEIGHT 64  // OLED display altura, em pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+// Pinos default, onde: SDA=GPIO21, e SCL=GPIO22
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= VARIÁVEIS =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+bool ID_Slave[] = {1,0,0,0,0,1,0};    // Defini o Endereço do Escravo
+const int PinoLow1 = 26;
+const int PinoLow2 = 27;
+const int PinoHigh1 = 13; 
+const int PinoHigh2 = 14;
+bool bits_ID[11], BitsDeControle[6],bits_M[8],bits_s[8],bits_g[8],bits_num[3],bits_fim[7],bits_Redu[5];
+int tamanho = sizeof(bits_num) / sizeof(bits_num[0]);
+float ReadHigh1 = 0;  
+float ReadHigh2 = 0;
+float ReadLow1 = 0;
+float ReadLow2 = 0;
+
+const int Sender_or_Receiver = 35;  // ESP VAI ENVIAR OU RECEBER MENSAGEM?
+// ESCOLHE A MENSAGEM DE ESCOLHA
+const int ChoiceMsg = 32;
+const int ChoiceMsg2 = 33;
+int ReadedValue = 0;
+
+
+
+int binaryToDecimal(bool bits_num[], int tamanho) {
+  int numero = 0;
+
+  for (int i = 0; i < tamanho; i++) {
+    numero = numero * 2 + bits_num[i];
+  }
+
+  return numero;
+}
+
+int numero = binaryToDecimal(bits_num, tamanho);
+int Tempo_de_espera = 500;
+
+
+
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= ESCOPO DAS FUNÇÕES =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// bool* read_bytes(int lenght);
+float h_or_l(float analog);
+bool comparaID(const bool* ID1, const bool* ID2);
+void Send0();
+void Send1();
+void FuncaoLeitura();
+void LetraM();
+void LetraS();
+void LetraG();
+void Num1();
+void Num2();
+void Num3();
+void Num4(); 
+
+// -------------------------------------------- Funcao 1 --------------------------------------------------------------------------------------------
+
+void funcaosend1() {
+
+  digitalWrite(PinoHigh1, HIGH);    // 3.3
+  digitalWrite(PinoHigh2, LOW);     // 0
+  digitalWrite(PinoLow1, HIGH);    // 3.3
+  digitalWrite(PinoLow2, LOW);     // 0
+}
+
+// -------------------------------------------- Funcao 0 --------------------------------------------------------------------------------------------
+
+void funcaosend0() {
+
+  digitalWrite(PinoHigh1, HIGH);    // 3.3
+  digitalWrite(PinoHigh2, HIGH);    // 3.3
+  digitalWrite(PinoLow1, LOW);     // 0
+  digitalWrite(PinoLow2, LOW);     // 0
+}
+
+// --------------------------------------------- Funcao Leitura -------------------------------------------------------------------------------------
+
+void FuncaoLeitura() {
+
+  pinMode(PinoHigh1, INPUT);
+  pinMode(PinoLow1, INPUT);
+  pinMode(PinoHigh2, INPUT);
+  pinMode(PinoLow2, INPUT);
+
+  ReadHigh1 = analogRead(PinoHigh1);
+  ReadHigh2 = analogRead(PinoHigh2);
+  ReadLow1 = analogRead(PinoLow1);
+  ReadLow2 = analogRead(PinoLow2);
+
+  Serial.println("Leitura H1");
+  Serial.println(ReadHigh1);
+  Serial.println("Leitura H2");
+  Serial.println(ReadHigh2);
+  Serial.println("Leitura L1");
+  Serial.println(ReadLow1);
+  Serial.println("Leitura L2");
+  Serial.println(ReadLow2);
+
+  float CHigh = ((ReadHigh1 + ReadHigh2) / 2);
+  float CLow = ((ReadLow1 + ReadLow2) / 2);
+
+  if ( (CHigh - CLow) > 2500) {
+    ReadedValue = 0;
+  }
+  else {
+    ReadedValue = 1;
+  }
+
+  Serial.println("ReadedValue");
+  Serial.println(ReadedValue);
+
+  delay(Tempo_de_espera);
+
+  pinMode(PinoHigh1, OUTPUT);
+  pinMode(PinoLow1, OUTPUT);
+  pinMode(PinoHigh2, OUTPUT);
+  pinMode(PinoLow2, OUTPUT);
+}
+
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(115200);
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+  pinMode(PinoHigh1, INPUT);
+  pinMode(PinoHigh2, INPUT);
+  pinMode(PinoLow1, INPUT);
+  pinMode(PinoLow2, INPUT);
+
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
+    display.print("Escravo 1");
+    display.setTextSize(2);
+    display.setCursor(0,40);
+    display.print("ID:1000001");
+    display.display();
+} 
+
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= MAIN =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void loop() {
+
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
+    display.print("Escravo 2");
+    display.setTextSize(2);
+    display.setCursor(0,40);
+    display.print("ID:1000010");
+    display.display();
+
+  int Value_Read2 = analogRead(Sender_or_Receiver);  // Lê o valor, Sender_or_Receiver 1 receber 0
+  float Voltage2 = (Value_Read2) / 4095;
+
+  int Value_Read3 = analogRead(ChoiceMsg);  // Escolha da msg parte 1
+  int Voltage3 = (Value_Read3) / 4095;
+
+  int Value_Read4 = analogRead(ChoiceMsg2);  // Escolha da msg parte 2
+  int Voltage4 = (Value_Read4) / 4095;
+
+  if(!Voltage2){
+    
+    // DECLARAÇÃO DAS VARIÁVEIS USADAS
+    ReadHigh1 = analogRead(PinoHigh1);  
+    ReadHigh2 = analogRead(PinoHigh2);
+    ReadLow1 = analogRead(PinoLow1);
+    ReadLow2 = analogRead(PinoLow2);
+
+    float CHigh = (ReadHigh1 + ReadHigh2)/2;
+    float CLow = (ReadLow1 + ReadLow2)/2;
+    float Value_Read;
+    if((CHigh - CLow) > 2600) {
+      Value_Read = 0;
+    }
+    else {
+      Value_Read = 1;
+    }
+
+    Serial.println(Value_Read, BIN);
+    delay(Tempo_de_espera);
+  
+    // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= VERIFICA SE TEM MENSAGEM PRA RECEBER =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+    if (!Value_Read) {
+      do {
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= SEPARA O COB-ID =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        for (int i = 0; i < 11; i++) {
+          // Passa por cada bit do escopo da ID
+          // Faça a leitura do bit e atribua ao array
+          // float bitLido = analogRead(PinoHigh1);  // Le o bit que recebeu do outro dispositivo
+          float ReadHigh1 = analogRead(PinoHigh1);  
+          float ReadHigh2 = analogRead(PinoHigh2);
+          float ReadLow1 = analogRead(PinoLow1);
+          float ReadLow2 = analogRead(PinoLow2);
+
+          /*
+          
+            Para Sender_or_Receiver:
+            1 - Dominante (ambos em 1.67 V)
+            0 - Recessivo ( 3.3 e 0 V)
+            Para Sender_or_Receiver 1:
+              H = 1.6V
+              L = 1.6V
+          Para ler, em ambos canais de H ou L:
+            3.3 V
+            1.6 V
+            0.0 V
+            Para Sender_or_Receiver 0:
+              H = 3.3V
+              L = 0.0V
+          Ligações Possíves:
+            3.3V -- (3.3V) -- 3.3V
+            3.3V -- (1.6V) -- 0.0V
+            0.0V --  (0V)  -- 0.0V
+
+            
+          */
+
+          float CHigh = (ReadHigh1 + ReadHigh2)/2;
+          float CLow = (ReadLow1 + ReadLow2)/2;
+          float bitLido = 1;
+
+          if((CHigh - CLow) > 2600) {
+            bitLido = 0;
+          }
+          else {
+            bitLido = 1;
+          }
+        // Define se o nível recebido é alto ou baixo
+          bits_ID[i] = bitLido;                 // Salva no vetor ID
+          Serial.print("BL = ");
+          Serial.println(bitLido);
+          delay(Tempo_de_espera);
+        }
+        // Printa o vetor ID inteiro
+        // Function Code
+        Serial.print(bits_ID[0], 0);
+        Serial.print(bits_ID[1], 0);
+        Serial.print(bits_ID[2], 0);
+        Serial.print(bits_ID[3], 0);
+        // Node ID
+        bool Node_ID[7];
+        for (int i = 0; i < 7; i++) {
+          Node_ID[i] = bits_ID[i+4];
+        }
+        Serial.print(bits_ID[4], 0);
+        Serial.print(bits_ID[5], 0);
+        Serial.print(bits_ID[6], 0);
+        Serial.print(bits_ID[7], 0);    
+        Serial.print(bits_ID[8], 0);
+        Serial.print(bits_ID[9], 0);
+        Serial.println(bits_ID[10], 0);
+
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= DETECTOR DO ESCRAVO DE DESTINO =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        if (comparaID(ID_Slave, Node_ID) == false) {
+          Serial.println("Slave não selecionado!");
+          Serial.println("Encerrando leitura da comunicação");
+
+          break;
+        }
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= DETECTOR DA FUNÇÃO =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        if ((bits_ID[2] != 1)) {
+          Serial.println("Escravo Enviando");
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Remetente:Escravo1");
+          display.display();
+        }
+        if ((bits_ID[2] != 0)) {
+          Serial.println("Master:Enviando");
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Remetente Mestre");
+          display.display();
+        }
+        Serial.println("Function ID: OK!");
+
+        
+
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Sender_or_Receiver BIT RDR =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        Serial.println("Mandando RTR ...");
+        Send0();
+        
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= BITS DE CONTROLE =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        delay(Tempo_de_espera);
+        for (int i = 0; i < 6; i++) {
+          // Passa por cada bit do escopo de Controle
+          // Faça a leitura do bit e atribua ao array
+          float ReadHigh1 = analogRead(PinoHigh1);  
+          float ReadHigh2 = analogRead(PinoHigh2);
+          float ReadLow1 = analogRead(PinoLow1);
+          float ReadLow2 = analogRead(PinoLow2);
+
+          float CHigh = (ReadHigh1 + ReadHigh2)/2;
+          float CLow = (ReadLow1 + ReadLow2)/2;
+          float bitLido = 1;
+
+          if((CHigh - CLow) > 2600) {
+            bitLido = 0;
+          }
+          else {
+            bitLido = 1;
+          }
+        // Define se o nível recebido é alto ou baixo
+          BitsDeControle[i] = bitLido;                 // Salva no vetor ID
+          Serial.print("BitsDeControle = ");
+          Serial.println(bitLido);
+          delay(Tempo_de_espera);
+        }
+        if ((BitsDeControle[0] != 0) || (BitsDeControle[1] != 0) || (BitsDeControle[2] != 0) || (BitsDeControle[3] != 1) || (BitsDeControle[4] != 1) || (BitsDeControle[5] != 1) ) {
+          Serial.println("Error: CONTROL BITS");
+          break;
+        }
+        Serial.println("OK!");
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= DETECTOR DE M =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        for (int i = 0; i < 8; i++) {
+          // Passa por cada bit do escopo de Controle
+          // Faça a leitura do bit e atribua ao array
+          float ReadHigh1 = analogRead(PinoHigh1);  
+          float ReadHigh2 = analogRead(PinoHigh2);
+          float ReadLow1 = analogRead(PinoLow1);
+          float ReadLow2 = analogRead(PinoLow2);
+
+
+          float CHigh = (ReadHigh1 + ReadHigh2)/2;
+          float CLow = (ReadLow1 + ReadLow2)/2;
+          float bitLido = 1;
+
+          if((CHigh - CLow) > 2600) {
+            bitLido = 0;
+          }
+          else {
+            bitLido = 1;
+          }
+        // Define se o nível recebido é alto ou baixo
+          bits_M[i] = bitLido;                 // Salva no vetor ID
+          Serial.print("bits_M = ");
+          Serial.println(bitLido);
+          delay(Tempo_de_espera);
+        }
+        if ((bits_M[0] != 0) || (bits_M[1] != 1) || (bits_M[2] != 0) || (bits_M[3] != 0) || (bits_M[4] != 1) || (bits_M[5] != 1) || (bits_M[6] != 0) || (bits_M[7] != 1)) {
+          Serial.println("Error: M CODE");
+          break;
+        }
+        Serial.println("OK!");
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= DETECTOR DE S =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        for (int i = 0; i < 8; i++) {
+          // Passa por cada bit do escopo de Controle
+          // Faça a leitura do bit e atribua ao array
+          float ReadHigh1 = analogRead(PinoHigh1);  
+          float ReadHigh2 = analogRead(PinoHigh2);
+          float ReadLow1 = analogRead(PinoLow1);
+          float ReadLow2 = analogRead(PinoLow2);
+
+
+          float CHigh = (ReadHigh1 + ReadHigh2)/2;
+          float CLow = (ReadLow1 + ReadLow2)/2;
+          float bitLido = 1;
+
+          if((CHigh - CLow) > 2600) {
+            bitLido = 0;
+          }
+          else {
+            bitLido = 1;
+          }
+        // Define se o nível recebido é alto ou baixo
+          bits_s[i] = bitLido;                 // Salva no vetor ID
+          Serial.print("bits_s = ");
+          Serial.println(bitLido);
+          delay(Tempo_de_espera);
+        }
+        if ((bits_s[0] != 0) || (bits_s[1] != 1) || (bits_s[2] != 1) || (bits_s[3] != 1) || (bits_s[4] != 0) || (bits_s[5] != 0) || (bits_s[6] != 1) || (bits_s[7] != 1)) {
+          Serial.println("Error: s CODE");
+          break;
+        }
+        Serial.println("OK!");
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= DETECTOR DE G =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        for (int i = 0; i < 8; i++) {
+          // Passa por cada bit do escopo de Controle
+          // Faça a leitura do bit e atribua ao array
+          float ReadHigh1 = analogRead(PinoHigh1);  
+          float ReadHigh2 = analogRead(PinoHigh2);
+          float ReadLow1 = analogRead(PinoLow1);
+          float ReadLow2 = analogRead(PinoLow2);
+
+          float CHigh = (ReadHigh1 + ReadHigh2)/2;
+          float CLow = (ReadLow1 + ReadLow2)/2;
+          float bitLido = 1;
+
+          if((CHigh - CLow) > 2600) {
+            bitLido = 0;
+          }
+          else {
+            bitLido = 1;
+          }
+        // Define se o nível recebido é alto ou baixo
+          bits_g[i] = bitLido;                 // Salva no vetor ID
+          Serial.print("bits_g = ");
+          Serial.println(bitLido);
+          delay(Tempo_de_espera);
+        }
+        if ((bits_g[0] != 0) || (bits_g[1] != 1) || (bits_g[2] != 1) || (bits_g[3] != 0) || (bits_g[4] != 0) || (bits_g[5] != 1) || (bits_g[6] != 1) || (bits_g[7] != 1)) {
+          Serial.println("Error: g CODE");
+          break;
+        }
+        Serial.println("OK!");
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= DETECTOR DE NUMERO =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        for (int i = 0; i < 3; i++) {
+          // Passa por cada bit do escopo de Controle
+          // Faça a leitura do bit e atribua ao array
+          float ReadHigh1 = analogRead(PinoHigh1);  
+          float ReadHigh2 = analogRead(PinoHigh2);
+          float ReadLow1 = analogRead(PinoLow1);
+          float ReadLow2 = analogRead(PinoLow2);
+
+
+          float CHigh = (ReadHigh1 + ReadHigh2)/2;
+          float CLow = (ReadLow1 + ReadLow2)/2;
+          float bitLido = 1;
+
+          if((CHigh - CLow) > 2600) {
+            bitLido = 0;
+          }
+          else {
+            bitLido = 1;
+          }
+        // Define se o nível recebido é alto ou baixo
+          bits_num[i] = bitLido;                 // Salva no vetor ID
+          Serial.print("bits_num = ");
+          Serial.println(bitLido);
+          delay(Tempo_de_espera);
+        }
+        display.clearDisplay();
+        int numero = binaryToDecimal(bits_num, tamanho);
+        switch(numero){
+        case 1:
+          Serial.println("OK!");
+          Serial.println("Msg1");
+          display.setTextSize(3);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Msg1");
+          display.display();
+
+          break;
+        case 2:
+          Serial.println("OK!");
+          Serial.println("Msg2");
+          display.setTextSize(3);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Msg2");
+          display.display();
+          break;
+        case 3:
+          Serial.println("OK!");
+          Serial.println("Msg3");
+          display.setTextSize(3);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Msg3");
+          display.display();
+
+          break;
+        case 4:
+          Serial.println("OK!");
+          Serial.println("Msg4");
+          display.setTextSize(3);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Msg4");
+          display.display();
+
+          break;
+        default:
+          Serial.println("Error: num CODE");
+
+          break;
+        }
+      
+        // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= DETECTOR DE REDUNDANCIA=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        for (int i = 0; i < 5; i++) {
+          // Passa por cada bit do escopo de Controle
+          // Faça a leitura do bit e atribua ao array
+          float ReadHigh1 = analogRead(PinoHigh1);  
+          float ReadHigh2 = analogRead(PinoHigh2);
+          float ReadLow1 = analogRead(PinoLow1);
+          float ReadLow2 = analogRead(PinoLow2);
+
+
+          float CHigh = (ReadHigh1 + ReadHigh2)/2;
+          float CLow = (ReadLow1 + ReadLow2)/2;
+          float bitLido = 1;
+
+          if((CHigh - CLow) > 2600) {
+            bitLido = 0;
+          }
+          else {
+            bitLido = 1;
+          }
+        // Define se o nível recebido é alto ou baixo
+          bits_Redu[i] = bitLido;                 // Salva no vetor ID
+          Serial.print("bits_Redu = ");
+          Serial.println(bitLido);
+          delay(Tempo_de_espera);
+        }
+        if ((bits_Redu[0] != 0) || (bits_Redu[1] != 1) || (bits_Redu[2] != 1) || (bits_Redu[3] != 1) || (bits_Redu[4] != 1)) {
+          Serial.println("Error: Redundancia CODE");
+          break;
+        }
+        Serial.println("OK!");
+               // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Sender_or_Receiver BIT CONFIRMAÇÃO =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        Serial.println("Mandando Confirmacao ...");
+        Send0();
+              // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= DETECTOR DE FIM=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        for (int i = 0; i < 7; i++) {
+          // Passa por cada bit do escopo de Controle
+          // Faça a leitura do bit e atribua ao array
+          float ReadHigh1 = analogRead(PinoHigh1);  
+          float ReadHigh2 = analogRead(PinoHigh2);
+          float ReadLow1 = analogRead(PinoLow1);
+          float ReadLow2 = analogRead(PinoLow2);
+
+
+          float CHigh = (ReadHigh1 + ReadHigh2)/2;
+          float CLow = (ReadLow1 + ReadLow2)/2;
+          float bitLido = 1;
+
+          if((CHigh - CLow) > 2600) {
+            bitLido = 0;
+          }
+
+          else {
+            bitLido = 1;
+          }
+
+        // Define se o nível recebido é alto ou baixo
+          bits_fim[i] = bitLido;                 // Salva no vetor ID
+          Serial.print("bits_fim = ");
+          Serial.println(bitLido);
+          delay(Tempo_de_espera);
+        }
+
+        if ((bits_fim[0] != 1) || (bits_fim[1] != 1) || (bits_fim[2] != 1) || (bits_fim[3] != 1) || (bits_fim[4] != 1) || (bits_fim[5] != 1) || (bits_fim[6] != 1)){
+          Serial.println("Error: FIM CODE");
+          break;
+        }
+        Serial.println("Protocolo CAN realizado com Sucesso!!!");
+        break;
+      } while (true);
+    }
+  }
+
+  else {
+    Serial.println("Escravo 1 envia a mensagem");
+
+    pinMode(PinoHigh1, OUTPUT);
+    pinMode(PinoHigh2, OUTPUT);
+    pinMode(PinoLow1, OUTPUT);
+    pinMode(PinoLow2, OUTPUT);
+  
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
+    display.print("Escravo 1");
+    display.setTextSize(2);
+    display.setCursor(0,40);
+    display.print("Enviando...");
+
+
+    funcaosend1();
+    delay(Tempo_de_espera * 5);
+    funcaosend0();
+    delay(Tempo_de_espera); // 1º Envia o bit de inicialização
+
+
+    //----------------------------------------------------------- Envia para o escravo 1 ------------------------------------------------------------------------------------------
+    Serial.println("Envio para Escravo 1");
+    Serial.println(" ");
+
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
+    display.print("Escravo 2 to");
+
+    display.setTextSize(2);
+    display.setTextColor(WHITE);
+    display.setCursor(0,20);
+    display.print("Escravo 1");
+
+
+
+    // ---------------------------------------------------------- Function code(0011) -----------------------------------------------------------------------------------------------------------
+
+    Serial.println("Enviando Function Code");
+    funcaosend0();
+    delay(Tempo_de_espera);              // 0
+
+    funcaosend1();
+    delay(Tempo_de_espera);              // 1
+    Serial.println("ok");
+
+    funcaosend0();                // 00
+    delay(Tempo_de_espera * 2);  
+
+    // ---------------------------------------------------------- 2º ID ESCRAVO 2 (1000010)---------------------------------------------------------------------------------------
+    Serial.println("Envio ID Escravo 2");
+
+    funcaosend1();
+    delay(Tempo_de_espera);
+
+    funcaosend0();
+    delay(Tempo_de_espera * 4);
+
+
+    funcaosend1();
+    delay(Tempo_de_espera);
+
+    funcaosend0();
+    delay(Tempo_de_espera);
+
+    Serial.println("OK");
+
+    //----------------------------------------------------------- 3 ºLeitura RTR -----------------------------------------------------------------------------------------------------
+    Serial.println("Recebendo RTR");
+
+    delay(Tempo_de_espera);
+    FuncaoLeitura();
+    delay(Tempo_de_espera);
+
+    Serial.println("OK");
+    //----------------------------------------------------------- 4º Bit de controle ---------------------------------------------------------------------------------------------------
+
+    if (!ReadedValue) {
+        
+
+      Serial.print("Imprime");
+
+      funcaosend0();
+      Serial.println("0");
+      delay(Tempo_de_espera * 3);
+      funcaosend1();
+      Serial.println("1");
+      delay(Tempo_de_espera * 3);
+      
+
+      //----------------------------------------------------------- 5º Bit de informação -------------------------------------------------------------------------------------------------
+      // ---------------------------------------------------------- Mensagem 1 Servo 1 ----------------------------------------------------------------------------------------------------
+
+      if (!Voltage3 && !Voltage4) {
+        Serial.println("MSG1");
+        Serial.println(" ");
+
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setTextColor(WHITE);
+        display.setCursor(40,0);
+        display.print("Enviando MSG1");         
+
+        LetraM();
+        LetraS();
+        LetraG();
+        Num1();
+
+        // 6° 15 para a mensagem 1, bit de redundância  (01111)
+        funcaosend0();
+        delay(Tempo_de_espera);
+
+        funcaosend1();
+        delay(Tempo_de_espera * 4);
+
+        // 7° Bit de confirmação
+        delay(Tempo_de_espera);
+        FuncaoLeitura();
+        delay(Tempo_de_espera);
+        if (!ReadedValue) {
+          Serial.println("Confirmado !");
+
+          // 8° Bit de fim
+          funcaosend1();
+          delay(Tempo_de_espera * 7);
+
+
+        }
+      }
+      // -----------------------------------------------------Mensagem 2 Servo 1 ------------------------------------------------------------------
+      if (!Voltage3 && Voltage4) {
+        Serial.println("MSG2");
+        Serial.println(" ");
+
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setTextColor(WHITE);
+        display.setCursor(40,0);
+        display.print("Enviando MSG2");    
+
+        LetraM();
+        LetraS();
+        LetraG();
+        Num2();
+
+        // 6° 15 para a mensagem 1, bit de redundância  (01111)
+        funcaosend0();
+        delay(Tempo_de_espera);
+
+        funcaosend1();
+        delay(Tempo_de_espera * 4);
+
+        // 7° Bit de confirmação
+        delay(Tempo_de_espera);
+        FuncaoLeitura();
+        delay(Tempo_de_espera);
+        if (!ReadedValue) {
+          Serial.println("Confirmado !");
+
+          // 8° Bit de fim
+          funcaosend1();
+          delay(Tempo_de_espera * 7);
+
+
+        }
+      }
+
+      //---------------------------------------------------------- Mensagem 3 Escravo 1 --------------------------------------------------------------------------------
+      if (Voltage3 && !Voltage4) {
+        Serial.println("MSG3");
+        Serial.println(" ");
+
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setTextColor(WHITE);
+        display.setCursor(40,0);
+        display.print("Enviando MSG3"); 
+          
+
+        LetraM();
+        LetraS();
+        LetraG();
+        Num3();
+
+        // 6° 15 para a mensagem 1, bit de redundância  (01111)
+        funcaosend0();
+        delay(Tempo_de_espera);
+
+        funcaosend1();
+        delay(Tempo_de_espera * 4);
+
+        // 7° Bit de confirmação
+        delay(Tempo_de_espera);
+        FuncaoLeitura();
+        delay(Tempo_de_espera);
+        if (!ReadedValue) {
+          Serial.println("Confirmado !");
+
+          // 8° Bit de fim
+          funcaosend1();
+          delay(Tempo_de_espera * 7);
+
+
+        }
+      }
+
+      //------------------------------------------------------ Mensagem 4 Escravo 1 --------------------------------------------------------------------------------------------
+      if (Voltage3 && Voltage4) {
+        Serial.println("MSG4");
+        Serial.println(" ");
+
+        display.clearDisplay();
+        display.setTextSize(2);
+        display.setTextColor(WHITE);
+        display.setCursor(40,0);
+        display.print("Enviando MSG4");        
+
+        LetraM();
+        LetraS();
+        LetraG();
+        Num4();
+
+        // 6° 15 para a mensagem 1, bit de redundância  (01111)
+
+        funcaosend0();
+        delay(Tempo_de_espera);
+
+        funcaosend1();
+        delay(Tempo_de_espera * 4);
+
+        // 7° Bit de confirmação
+        delay(Tempo_de_espera);
+        FuncaoLeitura();
+        delay(Tempo_de_espera);
+        if (!ReadedValue) {
+          Serial.println("Confirmado !");
+
+          // 8° Bit de fim
+          funcaosend1();
+          delay(Tempo_de_espera * 7);
+
+        }
+      }
+    }
+    //
+  } 
+}
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= FUNÇÃO QUE DEFINI SE É O NÍVEL É HIGH OU LOW =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float h_or_l(float analog){
+  if(analog > 2600){
+    analog = 0;
+  }
+  else{
+    analog = 1;
+  }
+  return analog;
+}
+
+bool comparaID(const bool* ID1, const bool* ID2) {
+  for (int i = 0; i < 7; i++) {
+        if (ID1[i] != ID2[i]) {
+            return false; // Retorna false se houver diferença
+        }
+    }
+    return true; // Retorna true se forem iguais
+}
+
+void Send1() {
+  pinMode(PinoHigh1, OUTPUT);
+  pinMode(PinoLow1, OUTPUT);
+  pinMode(PinoHigh2, OUTPUT);
+  pinMode(PinoLow2, OUTPUT);
+
+  digitalWrite(PinoHigh1, HIGH);     // 3.3
+  digitalWrite(PinoHigh2, LOW);      // 0 
+  digitalWrite(PinoLow1, HIGH);     // 3.3
+  digitalWrite(PinoLow2, LOW);      // 0
+  // delay(Tempo_de_espera);
+
+  pinMode(PinoHigh1, INPUT);
+  pinMode(PinoLow1, INPUT);
+  pinMode(PinoHigh2, INPUT);
+  pinMode(PinoLow2, INPUT);
+}
+
+void Send0() {
+  pinMode(PinoHigh1, OUTPUT);
+  pinMode(PinoLow1, OUTPUT);
+  pinMode(PinoHigh2, OUTPUT);
+  pinMode(PinoLow2, OUTPUT);
+
+  delay(Tempo_de_espera);
+  digitalWrite(PinoHigh1, HIGH);    // 3.3
+  digitalWrite(PinoHigh2, HIGH);    // 3.3 
+  digitalWrite(PinoLow1, LOW);     // 0
+  digitalWrite(PinoLow2, LOW);     // 0
+  delay(Tempo_de_espera);
+
+
+  pinMode(PinoHigh1, INPUT);
+  pinMode(PinoLow1, INPUT);
+  pinMode(PinoHigh2, INPUT);
+  pinMode(PinoLow2, INPUT);
+}
+
+// --------------------------------------------- Letra M (01001101) -------------------------------------------------------------------------------------------
+
+void LetraM() {
+
+  funcaosend0();
+  delay(Tempo_de_espera);
+
+  funcaosend1();
+  delay(Tempo_de_espera);
+
+  funcaosend0();
+  delay(Tempo_de_espera * 2);
+
+  funcaosend1();
+  delay(Tempo_de_espera * 2);
+
+  funcaosend0();
+  delay(Tempo_de_espera);
+
+  funcaosend1();
+  delay(Tempo_de_espera);
+}
+
+// --------------------------------------------- Letra S (01110011) ------------------------------------------------------------------------------------------------
+
+void LetraS() {
+
+  funcaosend0();
+  delay(Tempo_de_espera);
+
+  funcaosend1();
+  delay(Tempo_de_espera * 3);
+
+  funcaosend0();
+  delay(Tempo_de_espera * 2);
+
+  funcaosend1();
+  delay(Tempo_de_espera * 2);
+}
+
+// -------------------------------------------- Letra G (01100111) --------------------------------------------------------------------------------------------------
+
+void LetraG() {
+
+  funcaosend0();
+  delay(Tempo_de_espera);
+
+  funcaosend1();
+  delay(Tempo_de_espera * 2);
+
+  funcaosend0();
+  delay(Tempo_de_espera * 2);
+
+  funcaosend1();
+  delay(Tempo_de_espera * 3);
+}
+
+// -------------------------------------------- Número 1 (001) -------------------------------------------------------------------------------------------------------
+void Num1() {
+  funcaosend0();
+  delay(Tempo_de_espera * 2);
+
+  funcaosend1();
+  delay(Tempo_de_espera);
+}
+
+// -------------------------------------------- Número 2 (010) -------------------------------------------------------------------------------------------------------
+void Num2() {
+  funcaosend0();
+  delay(Tempo_de_espera);
+
+  funcaosend1();
+  delay(Tempo_de_espera);
+
+  funcaosend0();
+  delay(Tempo_de_espera);
+}
+
+// -------------------------------------------- Número 3 (011) -------------------------------------------------------------------------------------------------------
+void Num3() {
+  funcaosend0();
+  delay(Tempo_de_espera);
+
+  funcaosend1();
+  delay(Tempo_de_espera * 2);
+}
+
+
+// -------------------------------------------- Número 4 (100) -------------------------------------------------------------------------------------------------------
+void Num4() {
+  funcaosend1();
+  delay(Tempo_de_espera);
+
+  funcaosend0();
+  delay(Tempo_de_espera * 2);
+}
