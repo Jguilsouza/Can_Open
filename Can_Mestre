@@ -1,0 +1,838 @@
+/*
+  1º Bit de Start(0 para mensagem enviada);
+  2º Bit de ID ( 11 bits);
+  3º Bit de Requisição de transmissão(1 bit - Bit 0 mestre envia e bit 1 recebe);
+  4º Bit de controle (6 bits - definem tamanho de ID e data);
+  5º Bit de informação (0-64 bits  mensagem);
+  6º Bit de redundancia (16 bits) garante a integridade;
+  7º Bit de confirmação (2 bits) garante que recebeu;
+  8º Bit de fim(7 bit - serão 7 1 seguidos);
+
+  1 - Dominante ( ambos em 1.67 V)
+  0 - Recessivo ( 3.3 e 0 V)
+
+  IDs : ESCRAVO 1 (1000001)
+      Escravo 2 (1000010)
+      Mestre    (1000000)
+
+*/
+//---------------------------------------------- Display ------------------------------------------------------------------------------------------
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128  // OLED display largura, em pixels
+#define SCREEN_HEIGHT 64  // OLED display altura, em pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+// Pinos default, onde: SDA=GPIO21, e SCL=GPIO22
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+//---------------------------------------------- Can High e Low ------------------------------------------------------------------------------------
+
+const int DivH1 = 13;          //Parte 1 divisor de tensão can HIGH
+const int DivH2 = 12;          // Parte 2 divisor de tensão can HIGH
+const int DivL1 = 14;          // Parte 1 divisor de tensão can LOW
+const int DivL2 = 27;          // Parte 2 divisor de tensão can HIGH
+int Del = 500;
+bool flag  = false;
+
+//---------------------------------------------- Entradas-------------------------------------------------------------------------------------------
+
+const int EscolherEsp = 34;
+const int Enviar = 35;
+const int EscolherMSG = 32;
+const int EscolherMSG2 = 33;
+
+//---------------------------------------------- Leitura -------------------------------------------------------------------------------------------
+
+float LeituraCH1;
+float LeituraCH2;
+float LeituraCL1;
+float LeituraCL2;
+float ValorLido = 0;
+
+// --------------------------------------------- Letra M (01001101) -------------------------------------------------------------------------------------------
+
+void LetraM() {
+
+  funcaosend0();
+  delay(Del);
+
+  funcaosend1();
+  delay(Del);
+
+  funcaosend0();
+  delay(Del * 2);
+
+  funcaosend1();
+  delay(Del * 2);
+
+  funcaosend0();
+  delay(Del);
+
+  funcaosend1();
+  delay(Del);
+}
+
+// --------------------------------------------- Letra S (01110011) ------------------------------------------------------------------------------------------------
+
+void LetraS() {
+
+  funcaosend0();
+  delay(Del);
+
+  funcaosend1();
+  delay(Del * 3);
+
+  funcaosend0();
+  delay(Del * 2);
+
+  funcaosend1();
+  delay(Del * 2);
+}
+
+// -------------------------------------------- Letra G (01100111) --------------------------------------------------------------------------------------------------
+
+void LetraG() {
+
+  funcaosend0();
+  delay(Del);
+
+  funcaosend1();
+  delay(Del * 2);
+
+  funcaosend0();
+  delay(Del * 2);
+
+  funcaosend1();
+  delay(Del * 3);
+}
+
+// -------------------------------------------- Número 1 (001) -------------------------------------------------------------------------------------------------------
+void Num1() {
+  funcaosend0();
+  delay(Del * 2);
+
+  funcaosend1();
+  delay(Del);
+}
+
+// -------------------------------------------- Número 2 (010) -------------------------------------------------------------------------------------------------------
+void Num2() {
+  funcaosend0();
+  delay(Del);
+
+  funcaosend1();
+  delay(Del);
+
+  funcaosend0();
+  delay(Del);
+}
+
+// -------------------------------------------- Número 3 (011) -------------------------------------------------------------------------------------------------------
+void Num3() {
+  funcaosend0();
+  delay(Del);
+
+  funcaosend1();
+  delay(Del * 2);
+}
+
+
+// -------------------------------------------- Número 4 (100) -------------------------------------------------------------------------------------------------------
+void Num4() {
+  funcaosend1();
+  delay(Del);
+
+  funcaosend0();
+  delay(Del * 2);
+}
+
+
+// --------------------------------------------- Funcao Leitura -------------------------------------------------------------------------------------
+
+void FuncaoLeitura() {
+
+  pinMode(DivH1, INPUT);
+  pinMode(DivL1, INPUT);
+  pinMode(DivH2, INPUT);
+  pinMode(DivL2, INPUT);
+
+  LeituraCH1 = analogRead(DivH1);
+  LeituraCH2 = analogRead(DivH2);
+  LeituraCL1 = analogRead(DivL1);
+  LeituraCL2 = analogRead(DivL2);
+
+  Serial.println("Leitura H1");
+  Serial.println(LeituraCH1);
+  Serial.println("Leitura H2");
+  Serial.println(LeituraCH2);
+  Serial.println("Leitura L1");
+  Serial.println(LeituraCL1);
+  Serial.println("Leitura L2");
+  Serial.println(LeituraCL2);
+
+  float CHigh = ((LeituraCH1 + LeituraCH2) / 2);
+  float CLow = ((LeituraCL1 + LeituraCL2) / 2);
+
+  if ( (CHigh - CLow) > 2500) {
+    ValorLido = 0;
+  }
+  else {
+    ValorLido = 1;
+  }
+
+  Serial.println("ValorLido");
+  Serial.println(ValorLido);
+
+  delay(Del);
+
+  pinMode(DivH1, OUTPUT);
+  pinMode(DivL1, OUTPUT);
+  pinMode(DivH2, OUTPUT);
+  pinMode(DivL2, OUTPUT);
+}
+
+// --------------------------------------------- Funcao 1 -------------------------------------------------------------------------------------------
+
+void funcaosend1() {
+
+  digitalWrite(DivH1, HIGH);    // 3.3
+  digitalWrite(DivH2, LOW);     // 0
+  digitalWrite(DivL1, HIGH);    // 3.3
+  digitalWrite(DivL2, LOW);     // 0
+}
+
+// -------------------------------------------- Funcao 0 --------------------------------------------------------------------------------------------
+
+void funcaosend0() {
+
+  digitalWrite(DivH1, HIGH);    // 3.3
+  digitalWrite(DivH2, HIGH);    // 3.3
+  digitalWrite(DivL1, LOW);     // 0
+  digitalWrite(DivL2, LOW);     // 0
+}
+
+//----------------------------------------------- SETUP ---------------------------------------------------------------------------------------------
+
+void setup() {
+
+  Serial.begin(115200);
+
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+
+  pinMode(DivH1, OUTPUT);
+  pinMode(DivL1, OUTPUT);
+  pinMode(DivH2, OUTPUT);
+  pinMode(DivL2, OUTPUT);
+
+}
+// --------------------------------------------------------------------- LOOP --------------------------------------------------------------------------------------------------------------------------------------
+
+void loop() {
+
+
+  //---------------------------------------------------------------------- Dados de leitura (IN)-------------------------------------------------------------------------------------------------------------------------
+
+  int valorLeitura1 = analogRead(EscolherEsp);  // Lê o valor, Valor 0 envia para Esp escravo 0 e valor 1 envia para Esp escravo 1
+  float tensao1 = (valorLeitura1) / 4095;
+
+  int valorLeitura2 = analogRead(Enviar);  // Lê o valor, Enviar 1 receber 0
+  float tensao2 = (valorLeitura2) / 4095;
+
+  int valorLeitura3 = analogRead(EscolherMSG);  // Escolha da msg parte 1
+  int tensao3 = (valorLeitura3) / 4095;
+  
+  int valorLeitura4 = analogRead(EscolherMSG2);  // Escolha da msg parte 2
+  int tensao4 = (valorLeitura4) / 4095;
+
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(35,0);
+  display.print("MESTRE"); 
+  display.display();
+
+ if(!tensao2){
+ 
+    pinMode(DivH1, INPUT);
+    pinMode(DivL1, INPUT);
+    pinMode(DivH2, INPUT);
+    pinMode(DivL2, INPUT);
+
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(35,0);
+          display.print("MESTRE");
+          display.display(); 
+       
+ }
+  //------------------------------------------------------------ 1º Bit de inicialização ------------------------------------------------------------------------------
+  if (tensao2) {
+    Serial.println("Mestre envia a mensagem");
+
+    pinMode(DivH1, OUTPUT);
+    pinMode(DivL1, OUTPUT);
+    pinMode(DivH2, OUTPUT);
+    pinMode(DivL2, OUTPUT);
+  
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
+    display.print("Mestre envia");
+    display.display();
+
+    funcaosend1();
+    delay(Del * 5);
+    funcaosend0();
+    delay(Del); // 1º Envia o bit de inicialização
+
+
+    //----------------------------------------------------------- Envia para o escravo 1 ------------------------------------------------------------------------------------------
+
+    if (tensao1) {
+      Serial.println("Envia Escravo 1");
+      Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Escravo 1");
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("Function: 0011");
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("ID: 1000001");
+          display.display();
+
+
+      // ---------------------------------------------------------- Function code(0011) -----------------------------------------------------------------------------------------------------------
+
+      funcaosend0();
+      delay(Del * 2);              // 00
+
+      funcaosend1();
+      delay(Del * 2);              // 11
+      Serial.print("ok");
+
+
+      // ---------------------------------------------------------- 2º ID ESCRAVO 1 (1000001)---------------------------------------------------------------------------------------
+
+      funcaosend1();
+      delay(Del);
+
+      funcaosend0();
+      delay(Del * 5);
+
+      funcaosend1();
+      delay(Del);
+
+
+
+      //----------------------------------------------------------- 3 ºLeitura RTR -----------------------------------------------------------------------------------------------------
+
+      delay(Del);
+      FuncaoLeitura();
+      delay(Del);
+
+
+      //----------------------------------------------------------- 4º Bit de controle ---------------------------------------------------------------------------------------------------
+
+      if (!ValorLido) {
+         
+          display.clearDisplay();
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Leitura ok");
+          display.display();
+
+        Serial.print("Imprime");
+
+        funcaosend0();
+        Serial.println("0");
+        delay(Del * 3);
+        funcaosend1();
+        Serial.println("1");
+        delay(Del * 3);
+
+        //----------------------------------------------------------- 5º Bit de informação -------------------------------------------------------------------------------------------------
+        // ---------------------------------------------------------- Mensagem 1 Servo 1 ----------------------------------------------------------------------------------------------------
+
+        if (!tensao3 && !tensao4) {
+          Serial.println("MSG1");
+          Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(40,0);
+          display.print("MSG1"); 
+          
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("ID: 1000001 "); 
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("Escravo: 1"); 
+          display.display();        
+
+          LetraM();
+          LetraS();
+          LetraG();
+          Num1();
+
+          // 6° 15 para a mensagem 1, bit de redundância  (01111)
+          funcaosend0();
+          delay(Del);
+
+          funcaosend1();
+          delay(Del * 4);
+
+          // 7° Bit de confirmação
+          delay(Del);
+          FuncaoLeitura();
+          delay(Del);
+          if (!ValorLido) {
+            Serial.println("Confirmado !");
+
+            // 8° Bit de fim
+            funcaosend1();
+            delay(Del * 7);
+
+
+          }
+        }
+        // -----------------------------------------------------Mensagem 2 Servo 1 ------------------------------------------------------------------
+        if (!tensao3 && tensao4) {
+          Serial.println("MSG2");
+          Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(40,0);
+          display.print("MSG2"); 
+          
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("ID: 1000001 "); 
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("Escravo: 1"); 
+          display.display();       
+
+          LetraM();
+          LetraS();
+          LetraG();
+          Num2();
+
+          // 6° 15 para a mensagem 1, bit de redundância  (01111)
+          funcaosend0();
+          delay(Del);
+
+          funcaosend1();
+          delay(Del * 4);
+
+          // 7° Bit de confirmação
+          delay(Del);
+          FuncaoLeitura();
+          delay(Del);
+          if (!ValorLido) {
+            Serial.println("Confirmado !");
+
+            // 8° Bit de fim
+            funcaosend1();
+            delay(Del * 7);
+
+
+          }
+        }
+
+        //---------------------------------------------------------- Mensagem 3 Escravo 1 --------------------------------------------------------------------------------
+        if (tensao3 && !tensao4) {
+          Serial.println("MSG3");
+          Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(40,0);
+          display.print("MSG3"); 
+          
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("ID: 1000001 "); 
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("Escravo: 1"); 
+          display.display();       
+
+          LetraM();
+          LetraS();
+          LetraG();
+          Num3();
+
+          // 6° 15 para a mensagem 1, bit de redundância  (01111)
+          funcaosend0();
+          delay(Del);
+
+          funcaosend1();
+          delay(Del * 4);
+
+          // 7° Bit de confirmação
+          delay(Del);
+          FuncaoLeitura();
+          delay(Del);
+          if (!ValorLido) {
+            Serial.println("Confirmado !");
+
+            // 8° Bit de fim
+            funcaosend1();
+            delay(Del * 7);
+
+
+          }
+        }
+
+        //------------------------------------------------------ Mensagem 4 Escravo 1 --------------------------------------------------------------------------------------------
+        if (tensao3 && tensao4) {
+          Serial.println("MSG4");
+          Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(40,0);
+          display.print("MSG4"); 
+          
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("ID: 1000001 "); 
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("Escravo: 1"); 
+          display.display();       
+
+          LetraM();
+          LetraS();
+          LetraG();
+          Num4();
+
+          // 6° 15 para a mensagem 1, bit de redundância  (01111)
+
+          funcaosend0();
+          delay(Del);
+
+          funcaosend1();
+          delay(Del * 4);
+
+          // 7° Bit de confirmação
+          delay(Del);
+          FuncaoLeitura();
+          delay(Del);
+          if (!ValorLido) {
+            Serial.println("Confirmado !");
+
+            // 8° Bit de fim
+            funcaosend1();
+            delay(Del * 7);
+
+
+          }
+        }
+      }
+    }
+    //----------------------------------------------------------- Envia para o escravo 2 ------------------------------------------------------------------------------------------
+
+    if (!tensao1) {
+      Serial.println("Envia Escravo 2");
+      Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Escravo 2");
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("Function: 0011");
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("ID: 1000010");
+
+      // ---------------------------------------------------------- Function code(0011) -----------------------------------------------------------------------------------------------------------
+
+      funcaosend0();
+      delay(Del * 2);              // 00
+
+      funcaosend1();
+      delay(Del * 2);              // 11
+      Serial.print("ok");
+
+      // ---------------------------------------------------------- 2º ID ESCRAVO 1 (1000010)---------------------------------------------------------------------------------------
+
+      funcaosend1();
+      delay(Del);
+
+      funcaosend0();
+      delay(Del * 4);
+
+      funcaosend1();
+      delay(Del);
+
+      funcaosend0();
+      delay(Del);
+
+      //--------------------------------------------------------------- 3 ºLeitura RTR -----------------------------------------------------------------------------------------------------
+
+      delay(Del);
+      FuncaoLeitura();
+      delay(Del);
+
+      //-------------------------------------------------------------- 4º Bit de controle ---------------------------------------------------------------------------------------------------
+
+      if (!ValorLido) {
+
+          display.clearDisplay();
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);
+          display.print("Leitura ok");
+          display.display();
+
+        Serial.print("Imprime");
+
+        funcaosend0();
+        Serial.println("0");
+        delay(Del * 3);
+        funcaosend1();
+        Serial.println("1");
+        delay(Del * 3);
+
+        //----------------------------------------------------------- 5º Bit de informação -------------------------------------------------------------------------------------------------
+        // ---------------------------------------------------------- Mensagem 1 Servo 2 ----------------------------------------------------------------------------------------------------
+
+        if (!tensao3 && !tensao4) {
+          Serial.println("MSG1");
+          Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(40,0);
+          display.print("MSG1"); 
+          
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("ID: 1000010 "); 
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("Escravo: 2"); 
+          display.display();     
+          
+          LetraM();
+          LetraS();
+          LetraG();
+          Num1();
+
+          // 6° 15 para a mensagem 1, bit de redundância  (01111)
+          funcaosend0();
+          delay(Del);
+
+          funcaosend1();
+          delay(Del * 4);
+
+          // 7° Bit de confirmação
+          delay(Del);
+          FuncaoLeitura();
+          delay(Del);
+
+          if (!ValorLido) {
+            Serial.println("Confirmado !");
+
+            // 8° Bit de fim
+            funcaosend1();
+            delay(Del * 7);
+
+
+          }
+        }
+        // -----------------------------------------------------Mensagem 2 Servo 1 ------------------------------------------------------------------
+        if (!tensao3 && tensao4) {
+          Serial.println("MSG2");
+          Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(40,0);
+          display.print("MSG2"); 
+          
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("ID: 1000010 "); 
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("Escravo: 2"); 
+          display.display();   
+
+          LetraM();
+          LetraS();
+          LetraG();
+          Num2();
+
+          // 6° 15 para a mensagem 1, bit de redundância  (01111)
+          funcaosend0();
+          delay(Del);
+
+          funcaosend1();
+          delay(Del * 4);
+
+          // 7° Bit de confirmação
+          delay(Del);
+          FuncaoLeitura();
+          delay(Del);
+          if (!ValorLido) {
+            Serial.println("Confirmado !");
+
+            // 8° Bit de fim
+            funcaosend1();
+            delay(Del * 7);
+
+
+          }
+        }
+        // -------------------------------------------------------------Mensagem 3 Escravo 2 ------------------------------------------------------------------------------------
+        if (tensao3 && !tensao4) {
+          Serial.println("MSG3");
+          Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(40,0);
+          display.print("MSG3"); 
+          
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("ID: 1000010 "); 
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("Escravo: 2"); 
+          display.display();   
+
+          LetraM();
+          LetraS();
+          LetraG();
+          Num3();
+
+          // 6° 15 para a mensagem 1, bit de redundância  (01111)
+          funcaosend0();
+          delay(Del);
+
+          funcaosend1();
+          delay(Del * 4);
+
+          // 7° Bit de confirmação
+          delay(Del);
+          FuncaoLeitura();
+          delay(Del);
+
+          if (!ValorLido) {
+            Serial.println("Confirmado !");
+
+            // 8° Bit de fim
+            funcaosend1();
+            delay(Del * 7);
+
+
+          }
+        }
+
+        // -------------------------------------------------------------Mensagem 4 Escravo 2 ------------------------------------------------------------------------------------
+
+        if (tensao3 && tensao4) {
+          Serial.println("MSG4");
+          Serial.println(" ");
+
+          display.clearDisplay();
+          display.setTextSize(2);
+          display.setTextColor(WHITE);
+          display.setCursor(40,0);
+          display.print("MSG4"); 
+          
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,20);
+          display.print("ID: 1000010 "); 
+
+          display.setTextSize(1);
+          display.setTextColor(WHITE);
+          display.setCursor(0,40);
+          display.print("Escravo: 2"); 
+          display.display();   
+
+          LetraM();
+          LetraS();
+          LetraG();
+          Num4();
+
+          // 6° 15 para a mensagem 1, bit de redundância  (01111)
+          funcaosend0();
+          delay(Del);
+
+          funcaosend1();
+          delay(Del * 4);
+
+          // 7° Bit de confirmação
+          delay(Del);
+          FuncaoLeitura();
+          delay(Del);
+          if (!ValorLido) {
+            Serial.println("Confirmado !");
+
+            // 8° Bit de fim
+            funcaosend1();
+            delay(Del * 7);
+          }
+        }
+      }
+    }
+  }
+}
